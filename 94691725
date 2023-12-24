@@ -1,0 +1,156 @@
+Crear una sala de HaxBall
+var room = HBInit({
+    roomName: "Mi sala de HaxBall",
+    playerName: "Anfitrión",
+    noPlayer: true, // Remove host player (recommended!)
+    maxPlayers: 3,
+    public: false,
+});
+
+// Crear un objeto para almacenar el estado de administrador de los jugadores
+var adminStatus = {};
+
+// Crear un objeto para almacenar las autenticaciones de los administradores
+var adminAuths = {
+    "thr1.AAAAAGWHsWsTNUSg8mdFdg.JmToV6-q31c": true,
+    "asd11": true,
+    // Añade más autenticaciones de administrador aquí...
+};
+
+// Crear un objeto para almacenar las autenticaciones de los jugadores normales
+var playerAuths = {};
+
+// Crear un objeto para almacenar las estadísticas de los jugadores
+var playerStats = {};
+
+// Crear una variable para almacenar la cantidad máxima de jugadores antes de poner contraseña
+var maxPlayersBeforePassword = 2;
+
+// Crear una variable para almacenar la contraseña de la sala
+var roomPassword = "nosi12345";
+
+// Crear un objeto para almacenar el último y penúltimo jugador que tocó la pelota
+var lastTwoPlayersTouched = { lastPlayer: null, secondLastPlayer: null };
+
+
+// Crear una variable para almacenar el enlace de Discord
+var discordLink = "https://discord.com/invite/r8ZS9NTv6r";
+
+// Establecer la contraseña para admin2
+var admin2Password = "asd1234";
+
+room.setDefaultStadium("Big");
+room.setScoreLimit(5);
+room.setTimeLimit(0);
+
+// Cuando un jugador se une a la sala
+room.onPlayerJoin = function(player) {
+    // Si la autenticación del jugador está en el objeto adminAuths, otorgar admin2
+    if (adminAuths[player.auth]) {
+        room.setPlayerAdmin(player.id, true);
+        adminStatus[player.id] = 2;
+    } else {
+    // Si la cantidad de jugadores alcanza el máximo antes de poner contraseña, establecer la contraseña de la sala
+    if (room.getPlayerList().length >= maxPlayersBeforePassword) {
+        room.setPassword(roomPassword);
+    }
+};
+        // Almacenar la autenticación del jugador en el objeto playerAuths
+        playerAuths[player.auth] = true;
+        // Inicializar las estadísticas del jugador si no existen
+        if (!playerStats[player.auth]) {
+            playerStats[player.auth] = {
+                goals: 0,
+                assists: 0,
+                gamesPlayed: 0,
+                gamesWon: 0,
+                gamesLost: 0
+            };
+        }
+};
+
+// Cuando un jugador abandona la sala
+room.onPlayerLeave = function(player) {
+    // Si la cantidad de jugadores es menor que el máximo antes de poner contraseña, quitar la contraseña de la sala
+    if (room.getPlayerList().length < maxPlayersBeforePassword) {
+        room.setPassword(null);
+    }
+};
+    // Comando para otorgar derechos de administrador nivel 1
+    if (message === "!admin") {
+        // Verificar si ya hay un administrador en la sala
+        var isAdmin2Present = Object.values(adminStatus).some(status => status === 2);
+        if (!isAdmin2Present && adminStatus[player.id] !== 1) {
+            // Otorga derechos de administrador al jugador
+            room.setPlayerAdmin(player.id, true);
+            adminStatus[player.id] = 1;
+            room.sendAnnouncement("¡" + player.name + " ahora es admin1!", player.id);
+        } else {
+            room.sendAnnouncement("Ya hay un administrador en la sala.", player.id);
+        }
+        return false; // Evitar que el mensaje se envíe al chat general
+    }
+    // Comando para otorgar derechos de administrador nivel 2
+    else if (message.startsWith("!ofi ")) {
+        var password = message.split(" ")[1];
+        // Otorga derechos de administrador al jugador si la contraseña es correcta y si su token está en adminAuths
+        if (password === admin2Password && adminAuths[player.auth]) {
+            room.setPlayerAdmin(player.id, true);
+            adminStatus[player.id] = 2;
+            room.sendAnnouncement("¡" + player.name + " ahora es admin2!", player.id);
+        }
+        return false; // Evitar que el mensaje se envíe al chat general
+    }
+    // Comando para enviar un mensaje al chat del equipo
+    if (message.startsWith("!t ")) {
+        var teamMessage = player.name + ": " + message.split(" ").slice(1).join(" ");
+        var players = room.getPlayerList();
+        for (var playerId in players) {
+            if (players[playerId].team === player.team) {
+                room.sendAnnouncement(teamMessage, players[playerId].id, player.team === 1 ? 0xFF0000 : 0x0000FF);
+            }
+        }
+        return false; // Evitar que el mensaje se envíe al chat general
+    }
+    // Comando para enviar un mensaje privado a otro jugador
+    else if (message.startsWith("!pm ")) {
+        var splitMessage = message.split(" ");
+        var targetPlayerName = splitMessage[1];
+        var privateMessage = player.name + " Pv: " + splitMessage.slice(2).join(" ");
+        var players = room.getPlayerList();
+        for (var playerId in players) {
+            if (players[playerId].name === targetPlayerName) {
+                room.sendAnnouncement(privateMessage, players[playerId].id);
+                room.sendAnnouncement(privateMessage, player.id); // El remitente también puede ver el mensaje
+                return false; // Evitar que el mensaje se envíe al chat general
+            }
+        }
+    };
+    // Comando para enviar el enlace de Discord
+    else if (message === "!discord") {
+        room.sendAnnouncement("Aquí está el enlace de Discord: " + discordLink);
+        return false; // Evitar que el mensaje se envíe al chat general
+    }
+    // Comando para ver las estadísticas
+    else if (message === "!stats") {
+        if (playerStats[player.auth]) {
+            var stats = playerStats[player.auth];
+            room.sendAnnouncement(player.name + " ha jugado " + stats.gamesPlayed + " partidos, ha ganado " + stats.gamesWon + ", ha perdido " + stats.gamesLost + ", ha marcado " + stats.goals + " goles y ha hecho " + stats.assists + " asistencias.", player.id);
+        } else {
+            room.sendAnnouncement("No se encontraron estadísticas para " + player.name, player.id);
+        }
+        return false; // Evitar que el mensaje se envíe al chat general
+    }
+
+// Cuando se marca un gol
+room.onTeamGoal = function(team) {
+    room.sendAnnouncement("¡Gol del equipo " + (team === 1 ? "rojo" : "azul") + "!");
+    // Incrementar el contador de goles del último jugador que tocó la pelota
+    if (lastTwoPlayersTouched.lastPlayer && playerStats[lastTwoPlayersTouched.lastPlayer.auth]) {
+        playerStats[lastTwoPlayersTouched.lastPlayer.auth].goals++;
+    }
+    // Incrementar el contador de asistencias del penúltimo jugador que tocó la pelota
+    if (lastTwoPlayersTouched.secondLastPlayer && playerStats[lastTwoPlayersTouched.secondLastPlayer.auth]) {
+        playerStats[lastTwoPlayersTouched.secondLastPlayer.auth].assists++;
+    }
+};
